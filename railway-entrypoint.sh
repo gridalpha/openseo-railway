@@ -10,8 +10,18 @@ set -e
 # every subdomain of it, so this default covers any generated Railway domain
 # without a ${{gateway.RAILWAY_PUBLIC_DOMAIN}} reference — which would render
 # empty on a first-ever template deploy and 403 every request. Override it with
-# your own hostname when you attach a custom domain.
-: "${ALLOWED_HOST:=.up.railway.app}"
+# a leading-dot form of your own hostname when you attach a custom domain.
+: "${ALLOWED_HOST:=.railway.app}"
+
+# vite.config.ts adds a *second* allowed host: the hostname of BETTER_AUTH_URL.
+# Railway's health prober is anonymous and sends "Host: healthcheck.railway.app",
+# which no deployer-chosen ALLOWED_HOST would cover — the probe is then answered
+# 403 and the deployment sits in HEALTHCHECK for its whole window while the app
+# serves normally. Claiming that slot keeps the probe working whatever
+# ALLOWED_HOST is set to. The value is inert otherwise: auth.ts reads
+# BETTER_AUTH_URL only in hosted mode, and hardcodes a placeholder base URL here.
+: "${BETTER_AUTH_URL:=https://healthcheck.railway.app}"
+export BETTER_AUTH_URL
 
 # Exposes the Railway variables to the cloudflare:workers bindings the app reads
 # its config through; wrangler is non-interactive here and phones home otherwise.

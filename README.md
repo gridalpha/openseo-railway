@@ -49,7 +49,7 @@ build-relevant variables still gets the rebuild correctness requires.
 | `OPENSEO_UPSTREAM` | gateway | `open-seo.railway.internal:3001` | |
 | `PORT` | both | 8080 / 3001 | Railway sets this |
 | `DATAFORSEO_API_KEY` | open-seo | unset | base64 of your DataForSEO `login:password`. Every SEO data feature is unavailable until it is set; the app boots and reports it on `/api/health` |
-| `ALLOWED_HOST` | open-seo | `.up.railway.app` | Vite's preview server host allow-list. Set your own hostname when you attach a custom domain |
+| `ALLOWED_HOST` | open-seo | `.railway.app` | Vite preview host allow-list. A leading dot covers a domain and its subdomains. Set a leading-dot form of your own hostname when you attach a custom domain |
 | `OPENROUTER_API_KEY` | open-seo | unset | Enables SAM, the in-app agent |
 | `OPENROUTER_MODEL` | open-seo | unset | |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BETTER_AUTH_SECRET` | open-seo | unset | All three together enable Google Search Console |
@@ -58,6 +58,12 @@ build-relevant variables still gets the rebuild correctness requires.
 `AUTH_MODE`, `VITE_SHOW_DEVTOOLS`, `CLOUDFLARE_INCLUDE_PROCESS_ENV`,
 `NODE_OPTIONS`, `CI` and `WRANGLER_SEND_METRICS` are baked into the image;
 changing `AUTH_MODE` or `VITE_SHOW_DEVTOOLS` triggers a rebuild at boot.
+
+`BETTER_AUTH_URL` is defaulted to `https://healthcheck.railway.app` by the
+entrypoint. `vite.config.ts` adds that URL's hostname to the preview server's
+allowed-host list, and Railway's health prober sends exactly that `Host` — so
+the slot keeps the probe answering 200 whatever `ALLOWED_HOST` is set to. The
+value is otherwise inert: `auth.ts` reads it only in `hosted` mode.
 
 ## State
 
@@ -72,8 +78,7 @@ reads it when the preview server starts, and the mount hides it — the containe
 then crash-loops on `ENOENT: /app/.wrangler/deploy/config.json` while the
 deployment still reads `SUCCESS`.
 
-Upstream
-offers Postgres as a scale-out backend, but the app reaches it only through a
+Upstream offers Postgres as a scale-out backend, but the app reaches it only through a
 Cloudflare Hyperdrive binding and the other four stores stay on disk regardless,
 so it would add a service without removing the volume.
 

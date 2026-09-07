@@ -1,0 +1,33 @@
+{
+	admin off
+	auto_https off
+	servers {
+		# Railway's edge reaches containers from 100.64.0.0/10 and its own
+		# X-Forwarded-For entry sits in 152.233.0.0/17; Caddy walks the header
+		# right to left, so without the third range {client_ip} stops on a
+		# rotating Railway address instead of the real caller.
+		trusted_proxies static 100.64.0.0/10 fd00::/8 152.233.0.0/17
+	}
+}
+
+:{$PORT:8080} {
+	# Railway's health prober is anonymous, so a 401 here would fail the deploy
+	# exactly like a 503. handle blocks are evaluated in the order written, so
+	# this exact path has to come before the catch-all below.
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	handle {
+		# OpenSEO runs in AUTH_MODE=local_noauth and has no auth of its own.
+		# This is the deployment's only credential; the hash is derived from
+		# GATEWAY_PASSWORD at boot, because no Railway variable can compute one.
+		basic_auth {
+			{$GATEWAY_USERNAME:openseo} {$GATEWAY_PASSWORD_HASH}
+		}
+
+		reverse_proxy {$OPENSEO_UPSTREAM:open-seo.railway.internal:3001} {
+			header_up X-Real-IP {client_ip}
+		}
+	}
+}

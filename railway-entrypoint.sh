@@ -20,10 +20,20 @@ CI=true
 WRANGLER_SEND_METRICS=false
 export PORT ALLOWED_HOST CLOUDFLARE_INCLUDE_PROCESS_ENV CI WRANGLER_SEND_METRICS
 
-# The volume is mounted here. miniflare keeps D1, KV, R2, the Durable Objects
-# behind the chat agents and Workflow state under it, and creates the tree
-# itself — Railway's own lost+found beside it is never enumerated.
-mkdir -p /app/.wrangler
+# The volume is mounted at /data, NOT at /app/.wrangler. `vite build` writes
+# .wrangler/deploy/config.json, which the Cloudflare vite plugin reads when the
+# preview server starts, and a volume mounted over that directory hides it —
+# the container then crash-loops on "ENOENT: /app/.wrangler/deploy/config.json"
+# behind a SUCCESS deployment. Only the state tree is mutable, so link that one
+# directory across and leave the rest of .wrangler in the image layer.
+#
+# miniflare keeps D1, both KV namespaces, R2, the Durable Objects behind the
+# chat agents, and Workflow state under it, and creates the tree itself.
+STATE_ROOT="${RAILWAY_VOLUME_MOUNT_PATH:-/data}"
+mkdir -p "$STATE_ROOT/state" /app/.wrangler
+[ -L /app/.wrangler/state ] || rm -rf /app/.wrangler/state
+ln -sfn "$STATE_ROOT/state" /app/.wrangler/state
+echo "[railway] miniflare state -> $(readlink /app/.wrangler/state)"
 
 echo "[railway] OpenSEO: AUTH_MODE=${AUTH_MODE:-unset} PORT=$PORT ALLOWED_HOST=$ALLOWED_HOST"
 

@@ -61,9 +61,18 @@ changing `AUTH_MODE` or `VITE_SHOW_DEVTOOLS` triggers a rebuild at boot.
 
 ## State
 
-The `open-seo` service needs a volume mounted at `/app/.wrangler`. Everything the
-app owns lives there: the D1 (SQLite) database, both KV namespaces, the R2
-bucket, the Durable Objects behind the chat agents, and Workflow state. Upstream
+The `open-seo` service needs a volume mounted at `/data`, which the entrypoint
+links in as `/app/.wrangler/state`. Everything the app owns lives there: the D1
+(SQLite) database, both KV namespaces, the R2 bucket, the Durable Objects behind
+the chat agents, and Workflow state.
+
+Mounting the volume directly at `/app/.wrangler` looks tidier and does not work:
+`vite build` writes `.wrangler/deploy/config.json`, the Cloudflare vite plugin
+reads it when the preview server starts, and the mount hides it — the container
+then crash-loops on `ENOENT: /app/.wrangler/deploy/config.json` while the
+deployment still reads `SUCCESS`.
+
+Upstream
 offers Postgres as a scale-out backend, but the app reaches it only through a
 Cloudflare Hyperdrive binding and the other four stores stay on disk regardless,
 so it would add a service without removing the volume.

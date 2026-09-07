@@ -7,7 +7,15 @@ set -eu
 
 : "${PORT:=8080}"
 : "${GATEWAY_USERNAME:=openseo}"
-: "${OPENSEO_UPSTREAM:=open-seo.railway.internal:3001}"
+
+# A ${{open-seo.RAILWAY_PRIVATE_DOMAIN}} reference renders as an empty string
+# until that service owns a deployment, which is exactly the state a template's
+# first deploy is in — so the variable arrives set, and set to a bare ":3001"
+# that Caddy would bake as its upstream. Repair it on the value's shape rather
+# than only on the variable being unset.
+case "${OPENSEO_UPSTREAM:-}" in
+  "" | ":"*) OPENSEO_UPSTREAM=open-seo.railway.internal:3001 ;;
+esac
 
 if [ -z "${GATEWAY_PASSWORD_HASH:-}" ]; then
   if [ -z "${GATEWAY_PASSWORD:-}" ]; then
